@@ -1,5 +1,5 @@
 // src/commands/reactionrole.js
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { SlashCommandBuilder, PermissionFlagsBits, InteractionResponseFlags } = require('discord.js');
 
 module.exports = { // <--- This is the object being exported
     data: new SlashCommandBuilder() // <--- This is the 'data' property
@@ -47,7 +47,7 @@ module.exports = { // <--- This is the object being exported
             const existingConfig = configs.find(c => c.messageId === messageId && c.emoji === emoji);
             if (existingConfig) {
                 if (existingConfig.roleId === role.id) {
-                     return interaction.reply({ content: `This emoji (${emoji}) on this message is already set up for the ${role.name} role.`, ephemeral: true });
+                     return interaction.reply({ content: `This emoji (${emoji}) on this message is already set up for the ${role.name} role.`, flags: [InteractionResponseFlags.Ephemeral] });
                 }
                 existingConfig.roleId = role.id;
             } else {
