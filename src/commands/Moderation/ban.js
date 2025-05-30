@@ -120,7 +120,7 @@ module.exports = {
                 .setThumbnail(targetMember.user.displayAvatarURL())
                 .addFields(
                     { name: 'User', value: `${targetMember.user.tag} (${targetMember.id})`, inline: true },
-                    { name: 'Moderator', value: `${interaction.user.tag}`, inline: true },
+                    { name: 'Banned by', value: `${interaction.user.tag}`, inline: true },
                     { name: 'Reason', value: reason }
                 )
                 .setTimestamp();
