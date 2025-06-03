@@ -28,6 +28,7 @@ async function endGiveaway(client, guildId, messageId, db) {
     } catch (channelError) {
         console.error(`[Giveaway End Function] Could not fetch channel ${giveawayData.channelId} for giveaway ${messageId}: ${channelError.message}`);
         await db.set(`${giveawayKey}.status`, 'error_channel_fetch_failed');
+        console.log(`[Giveaway Button] DB set for ${giveawayKey} successful.`);
         activeGiveaways.delete(messageId);
         return;
     }
