@@ -66,8 +66,10 @@ async function endGiveaway(client, guildId, messageId, db) {
     const endedEmbed = new EmbedBuilder()
         .setTitle(`🎉 Giveaway Ended: ${giveawayData.prize} 🎉`)
         .setDescription(`**Winner(s):** ${winnerMentions}\n\nHosted by: <@${giveawayData.hostId}>\nEntries: ${entrants.length}`)
+        .setAuthor({ name: 'Elevate', iconURL: 'https://cdn.discordapp.com/attachments/1313509092630855722/1375503075485417703/Elevate_121.png?ex=6831ec90&is=68309b10&hm=a7de64ee3b3f67cde516b6c2bd7967418e8c5ca8e9f7d3efbdcf20afb08b0718&' })
         .setColor(Colors.Red)
         .setTimestamp(giveawayData.endTime)
+        .setThumbnail('https://cdn.discordapp.com/attachments/1313509092630855722/1375503075883749428/Elevate_PNG2.png?ex=6831ec90&is=68309b10&hm=c68a1b123dbd1d9e1e468f6d2aafcddaefcbf7d812bc8e353a7881a6e75c82b6&')
         .setFooter({ text: `Giveaway ID: ${messageId} | Ended` });
 
     const endedButtonRow = new ActionRowBuilder().addComponents(
@@ -198,8 +200,10 @@ module.exports = {
                 .setTitle(`🎉 Giveaway: ${prize} 🎉`)
                 .setDescription(`Click the button to enter!\nEnds: <t:${endTimeSeconds}:R> (<t:${endTimeSeconds}:F>)\nHosted by: ${hostUser}`)
                 .addFields({ name: 'Winners', value: `${winnerCount}` })
-                .setColor(Colors.Aqua)
+                .setAuthor({ name: 'Elevate', iconURL: 'https://cdn.discordapp.com/attachments/1313509092630855722/1375503075485417703/Elevate_121.png?ex=6831ec90&is=68309b10&hm=a7de64ee3b3f67cde516b6c2bd7967418e8c5ca8e9f7d3efbdcf20afb08b0718&' })
+                .setColor(Colors.Blue)
                 .setTimestamp(endTime)
+                .setThumbnail('https://cdn.discordapp.com/attachments/1313509092630855722/1375503075883749428/Elevate_PNG2.png?ex=6831ec90&is=68309b10&hm=c68a1b123dbd1d9e1e468f6d2aafcddaefcbf7d812bc8e353a7881a6e75c82b6&')
                 .setFooter({ text: `Giveaway ID will be message ID | Ends at` });
 
             const entryButton = new ButtonBuilder()

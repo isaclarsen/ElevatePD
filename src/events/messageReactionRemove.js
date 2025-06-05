@@ -3,19 +3,13 @@ const { Events } = require('discord.js');
 
 module.exports = {
     name: Events.MessageReactionRemove,
-    async execute(reaction, user, potentialMysteryArg, actual_db) { // MODIFIED: Added potentialMysteryArg, actual_db
-        // If actual_db is undefined, it means only 3 args were passed, so potentialMysteryArg is the db
-        const db = actual_db !== undefined ? actual_db : potentialMysteryArg; // ADDED THIS LINE
+    async execute(reaction, user, db, client) {
 
         // ADDED/MODIFIED DEBUG LOGS (optional but good for confirmation)
         console.log(`[ReactionRemove V2 Debug] Event triggered. Emoji: ${reaction.emoji.name}, User: ${user.tag}`);
         console.log(`[ReactionRemove V2 Debug] reaction type: ${reaction ? reaction.constructor.name : typeof reaction}`);
         console.log(`[ReactionRemove V2 Debug] user type: ${user ? user.constructor.name : typeof user}`);
         console.log(`[ReactionRemove V2 Debug] potentialMysteryArg type: ${potentialMysteryArg ? (potentialMysteryArg.constructor ? potentialMysteryArg.constructor.name : typeof potentialMysteryArg) : typeof potentialMysteryArg}`);
-        if (potentialMysteryArg && typeof potentialMysteryArg === 'object') console.log(`[ReactionRemove V2 Debug] potentialMysteryArg keys: ${Object.keys(potentialMysteryArg).join(', ')}`);
-        console.log(`[ReactionRemove V2 Debug] actual_db type: ${actual_db ? (actual_db.constructor ? actual_db.constructor.name : typeof actual_db) : typeof actual_db}`);
-        console.log(`[ReactionRemove V2 Debug] Using 'db' variable of type: ${db ? (db.constructor ? db.constructor.name : typeof db) : typeof db}`);
-        console.log(`[ReactionRemove V2 Debug] Does selected 'db' have .get? ${db && typeof db.get === 'function'}`);
 
 
         // Ignore bot reactions
