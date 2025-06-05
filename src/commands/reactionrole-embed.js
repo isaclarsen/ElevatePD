@@ -1,43 +1,80 @@
 // src/commands/reactionrole-embed.js
-const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors } = require('discord.js'); // Added Colors
+const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Colors } = require('discord.js');
+const { v4: uuidv4 } = require('uuid'); // For unique button IDs
 
+// src/commands/reactionrole-embed.js
+// ...
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('reactionrole-embed')
-        .setDescription('Creates an embed with buttons for reaction roles.')
+        .setDescription('Creates a structured embed for reaction roles (Dyno style).')
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageRoles)
         .setDMPermission(false)
-        .addStringOption(option => option.setName('title').setDescription('The title of the embed.').setRequired(true))
-        .addStringOption(option => option.setName('description').setDescription('The description of the embed.').setRequired(true))
-        // Add options for up to 5 buttons/roles
-        .addRoleOption(option => option.setName('role1').setDescription('The first role.').setRequired(true))
-        .addStringOption(option => option.setName('label1').setDescription('Label for the first button.').setRequired(true))
-        .addStringOption(option => option.setName('emoji1').setDescription('Emoji for the first button (optional).'))
-        .addRoleOption(option => option.setName('role2').setDescription('The second role (optional).'))
-        .addStringOption(option => option.setName('label2').setDescription('Label for the second button (optional).'))
-        .addStringOption(option => option.setName('emoji2').setDescription('Emoji for the second button (optional).'))
-        .addRoleOption(option => option.setName('role3').setDescription('The third role (optional).'))
-        .addStringOption(option => option.setName('label3').setDescription('Label for the third button (optional).'))
-        .addStringOption(option => option.setName('emoji3').setDescription('Emoji for the third button (optional).'))
-        .addRoleOption(option => option.setName('role4').setDescription('The fourth role (optional).'))
-        .addStringOption(option => option.setName('label4').setDescription('Label for the fourth button (optional).'))
-        .addStringOption(option => option.setName('emoji4').setDescription('Emoji for the fourth button (optional).'))
-        .addRoleOption(option => option.setName('role5').setDescription('The fifth role (optional).'))
-        .addStringOption(option => option.setName('label5').setDescription('Label for the fifth button (optional).'))
-        .addStringOption(option => option.setName('emoji5').setDescription('Emoji for the fifth button (optional).')),
+        // --- REQUIRED OPTIONS FIRST ---
+        .addStringOption(option =>
+            option.setName('title')
+                .setDescription('The main title (e.g., "Enhance your experience!").')
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName('notice_text')
+                .setDescription('Text for the "Important Notice" section.')
+                .setRequired(true))
+        .addStringOption(option =>
+            option.setName('main_text')
+                .setDescription('Main paragraph text. Use Discord markdown for emphasis (e.g., **bold**).')
+                .setRequired(true))
+        .addRoleOption(option => // For Button 1
+            option.setName('role1')
+                .setDescription('The first role.')
+                .setRequired(true))
+        .addStringOption(option => // For Button 1
+            option.setName('label1')
+                .setDescription('Label for the first button.')
+                .setRequired(true))
+        // --- OPTIONAL OPTIONS NEXT ---
+        .addStringOption(option => // Optional Thumbnail
+            option.setName('thumbnail_url')
+                .setDescription('URL for the E logo thumbnail on the right (e.g., your E logo).')
+                .setRequired(false))
+        .addStringOption(option => // Optional Emoji for Button 1
+            option.setName('emoji1')
+                .setDescription('Emoji for the first button (optional).')
+                .setRequired(false))
+        // Button 2 (All Optional)
+        .addRoleOption(option => option.setName('role2').setDescription('The second role.').setRequired(false))
+        .addStringOption(option => option.setName('label2').setDescription('Label for the second button.').setRequired(false))
+        .addStringOption(option => option.setName('emoji2').setDescription('Emoji for the second button.').setRequired(false))
+        // Button 3 (All Optional)
+        .addRoleOption(option => option.setName('role3').setDescription('The third role.').setRequired(false))
+        .addStringOption(option => option.setName('label3').setDescription('Label for the third button.').setRequired(false))
+        .addStringOption(option => option.setName('emoji3').setDescription('Emoji for the third button.').setRequired(false))
+        // Button 4 (All Optional)
+        .addRoleOption(option => option.setName('role4').setDescription('The fourth role.').setRequired(false))
+        .addStringOption(option => option.setName('label4').setDescription('Label for the fourth button.').setRequired(false))
+        .addStringOption(option => option.setName('emoji4').setDescription('Emoji for the fourth button.').setRequired(false))
+        // Button 5 (All Optional)
+        .addRoleOption(option => option.setName('role5').setDescription('The fifth role.').setRequired(false))
+        .addStringOption(option => option.setName('label5').setDescription('Label for the fifth button.').setRequired(false))
+        .addStringOption(option => option.setName('emoji5').setDescription('Emoji for the fifth button.').setRequired(false)),
 
     async execute(interaction, db) {
+        await interaction.deferReply({ ephemeral: true }); // Defer early
+
         const title = interaction.options.getString('title');
-        const description = interaction.options.getString('description');
+        const noticeText = interaction.options.getString('notice_text');
+        const mainText = interaction.options.getString('main_text');
         const guildId = interaction.guild.id;
 
+        // Construct the description in the desired format
+        const description = `⚠️ **Important notice:**\n\n${noticeText}\n\n${mainText}\n\nThanks for joining Elevate!`;
+
         const embed = new EmbedBuilder()
+            .setAuthor({ name: 'Elevate', iconURL: 'https://cdn.discordapp.com/attachments/1313509092630855722/1375503075485417703/Elevate_121.png?ex=6831ec90&is=68309b10&hm=a7de64ee3b3f67cde516b6c2bd7967418e8c5ca8e9f7d3efbdcf20afb08b0718&' })
             .setTitle(title)
             .setDescription(description)
-            .setColor(Colors.Blue) // MODIFIED: Set color to Blue
-            .setAuthor({ name: 'Elevate', iconURL: 'https://cdn.discordapp.com/attachments/1313509092630855722/1375503075485417703/Elevate_121.png?ex=6831ec90&is=68309b10&hm=a7de64ee3b3f67cde516b6c2bd7967418e8c5ca8e9f7d3efbdcf20afb08b0718&' })
-            .setFooter({ text: 'Elevate PD - 2025' }) // ADDED: Footer
-            .setThumbnail('https://cdn.discordapp.com/attachments/1313509092630855722/1375503075883749428/Elevate_PNG2.png?ex=6831ec90&is=68309b10&hm=c68a1b123dbd1d9e1e468f6d2aafcddaefcbf7d812bc8e353a7881a6e75c82b6&')
+            .setColor(0x3498DB) // A nice blue color, similar to Dyno's if it uses blue
+            .setThumbnail('https://cdn.discordapp.com/attachments/1313509092630855722/1375503075883749428/Elevate_PNG2.png?ex=6831ec90&is=68309b10&hm=c68a1b123dbd1d9e1e468f6d2aafcddaefcbf7d812bc8e353a7881a6e75c82b6&') // Your E logo
+            .setFooter({ text: '🇪 Elevate Community' }); // Or 'Elevate PD - 2025' if you prefer from your image
 
         const buttonsConfig = [];
         const actionRow = new ActionRowBuilder();
@@ -48,76 +85,61 @@ module.exports = {
             const label = interaction.options.getString(`label${i}`);
             const emoji = interaction.options.getString(`emoji${i}`);
 
-            if (role && label) {
-                if (buttonsAdded >= 5) {
-                    await interaction.reply({ content: 'You can add a maximum of 5 buttons per embed message using this command.', ephemeral: true });
-                    return;
-                }
-                const customId = `rr-button_${role.id}`;
+            if (role && label) { // Both role and label must be present for a button
+                if (buttonsAdded >= 5) break; // Should not happen if options are limited to 5 pairs
+
+                // More unique customId for buttons to avoid potential clashes if multiple RR messages assign same role
+                const customId = `rr-button_${role.id}_${uuidv4().substring(0,8)}`;
 
                 const button = new ButtonBuilder()
                     .setCustomId(customId)
                     .setLabel(label)
-                    .setStyle(ButtonStyle.Secondary); // Default style, you can change this too
+                    .setStyle(ButtonStyle.Secondary); // Greyish buttons like Dyno
 
                 if (emoji) {
                     try {
                         button.setEmoji(emoji);
                     } catch (error) {
-                        console.warn(`[ReactionRoleEmbed] Invalid emoji provided for button ${i}: ${emoji}. Error: ${error.message}`);
-                        // Optionally inform user, or just proceed without emoji
-                        // You could send a followup if the interaction is already replied to, or editReply
-                        // For now, just logging it.
+                        console.warn(`[ReactionRoleEmbed] Invalid emoji for button ${i} ('${emoji}'): ${error.message}`);
                     }
                 }
-
                 actionRow.addComponents(button);
-                buttonsConfig.push({
-                    customId: customId,
-                    roleId: role.id,
-                    label: label
-                });
+                buttonsConfig.push({ customId, roleId: role.id, label });
                 buttonsAdded++;
-            } else if (role || label) {
-                await interaction.reply({ content: `For button ${i}, both role and label must be provided if either is present.`, ephemeral: true });
-                return;
+            } else if (role || label) { // If one is provided but not the other, it's an incomplete pair
+                return interaction.editReply({ content: `For button configuration #${i}, both role and label are required if one is provided.` });
             }
         }
 
         if (buttonsAdded === 0) {
-            await interaction.reply({ content: 'You must configure at least one button and role.', ephemeral: true });
-            return;
+            return interaction.editReply({ content: 'You must configure at least one button (role and label).' });
         }
 
         try {
-            // Defer reply if processing might take time, though sending a message is usually fast
-            // await interaction.deferReply({ ephemeral: true });
-
             const message = await interaction.channel.send({ embeds: [embed], components: [actionRow] });
 
             const dbKey = `reactionrole_button_messages_${guildId}`;
             let guildConfigs = await db.get(dbKey) || [];
-
             guildConfigs.push({
                 messageId: message.id,
                 channelId: message.channel.id,
-                embedDetails: { title, description, color: Colors.Blue, footer: 'Elevate PD - 2025' }, // Store new details
+                embedDetails: { // Storing relevant details for potential future use (e.g., editing the embed)
+                    title: title,
+                    constructedDescription: description, // Store the full constructed description
+                    thumbnailUrl: 'https://cdn.discordapp.com/attachments/1313509092630855722/1375503075883749428/Elevate_PNG2.png?ex=6831ec90&is=68309b10&hm=c68a1b123dbd1d9e1e468f6d2aafcddaefcbf7d812bc8e353a7881a6e75c82b6&',
+                    footerText: '🇪 Elevate Community', // Or your preferred footer
+                    authorName: 'Elevate',
+                    authorIconUrl: 'https://cdn.discordapp.com/attachments/1313509092630855722/1375503075485417703/Elevate_121.png?ex=6831ec90&is=68309b10&hm=a7de64ee3b3f67cde516b6c2bd7967418e8c5ca8e9f7d3efbdcf20afb08b0718&'
+                },
                 buttons: buttonsConfig
             });
-
             await db.set(dbKey, guildConfigs);
 
-            // If deferred: await interaction.editReply({ content: 'Reaction role embed with buttons created successfully!', ephemeral: true });
-            await interaction.reply({ content: 'Reaction role embed with buttons created successfully!', ephemeral: true });
-
+            await interaction.editReply({ content: 'Reaction role embed created successfully with the new style!' });
 
         } catch (error) {
             console.error('Error creating reaction role embed:', error);
-            if (interaction.deferred || interaction.replied) {
-                await interaction.followUp({ content: 'An error occurred while creating the reaction role embed.', ephemeral: true });
-            } else {
-                await interaction.reply({ content: 'An error occurred while creating the reaction role embed.', ephemeral: true });
-            }
+            await interaction.editReply({ content: 'An error occurred while creating the reaction role embed. Please ensure I have permissions to send messages and embeds in this channel.' });
         }
     },
 };
