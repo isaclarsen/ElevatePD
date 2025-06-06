@@ -77,17 +77,8 @@ module.exports = {
                 .addStringOption(option => option.setName('button3_label').setDescription('Label for the third ticket category button.').setRequired(false))
                 .addStringOption(option => option.setName('button3_category_name').setDescription('Internal category name for button 3.').setRequired(false))
                 .addStringOption(option => option.setName('button3_emoji').setDescription('Optional: Emoji for the third button.').setRequired(false))
-        )
-        .addSubcommand(subcommand => // Keep your delete subcommand
-            subcommand
-                .setName('delete')
-                .setDescription('Permanently deletes a ticket channel.')
-                .addChannelOption(option =>
-                    option.setName('ticket_channel')
-                        .setDescription('The ticket channel to delete.')
-                        .addChannelTypes(ChannelType.GuildText)
-                        .setRequired(true))
         ),
+
 
     async execute(interaction, db) {
         const subcommand = interaction.options.getSubcommand();
@@ -183,79 +174,7 @@ module.exports = {
                 await interaction.editReply({ content: '`❌` Failed to create the ticket panel.' });
             }
 
-        } else if (subcommand === 'delete') {
-            // --- DEFER REPLY FOR DELETE SUBCOMMAND ---
-            await interaction.deferReply({ ephemeral: true });
-            console.log(`[Ticket Delete SC] User ${interaction.user.tag} initiated /ticket delete.`);
-
-            if (!interaction.member.permissions.has(PermissionFlagsBits.ManageChannels)) {
-                console.log(`[Ticket Delete SC] User ${interaction.user.tag} lacks ManageChannels permission.`);
-                return interaction.editReply({ content: '`❌` You need the "Manage Channels" permission to delete tickets.' });
-            }
-
-            const channelToDelete = interaction.options.getChannel('ticket_channel');
-            console.log(`[Ticket Delete SC] Attempting to delete channel: ${channelToDelete ? channelToDelete.name : 'N/A'} (ID: ${channelToDelete ? channelToDelete.id : 'N/A'})`);
-
-
-            if (!channelToDelete || channelToDelete.type !== ChannelType.GuildText) { // Ensure it's a text channel
-                console.log(`[Ticket Delete SC] Invalid or non-text channel specified: ${channelToDelete ? channelToDelete.id : 'None'}`);
-                return interaction.editReply({ content: '`❌` Please specify a valid text channel to delete.' });
-            }
-
-            const ticketDataKey = `ticket_data_${guildId}_${channelToDelete.id}`;
-            const ticketData = await db.get(ticketDataKey);
-            console.log(`[Ticket Delete SC] Fetched ticket data for key ${ticketDataKey}. Data found: ${!!ticketData}`);
-
-
-            if (!ticketData) {
-                // It's possible the channel exists but isn't in our DB as a ticket, or was already cleaned.
-                // We can still attempt to delete the channel if the user has perms.
-                console.log(`[Ticket Delete SC] No ticket data found in DB for ${channelToDelete.name}. Attempting direct deletion if user has perms.`);
-                 try {
-                    await channelToDelete.delete(`Ticket channel deleted by ${interaction.user.tag} via /ticket delete (no DB record found).`);
-                    console.log(`[Ticket Delete SC] Channel ${channelToDelete.name} (ID: ${channelToDelete.id}) deleted directly by ${interaction.user.tag}.`);
-                    return interaction.editReply({ content: `\`✅\` Channel **${channelToDelete.name}** has been deleted. (No prior ticket record found in my database).` });
-                } catch (directDeleteError) {
-                    console.error(`[Ticket Delete SC] Error directly deleting channel ${channelToDelete.id} (no DB record):`, directDeleteError);
-                     if (directDeleteError.code === 10003) { // Unknown Channel
-                        return interaction.editReply({ content: `\`❌\` Channel **${channelToDelete.name}** could not be found or was already deleted.` });
-                    } else if (directDeleteError.code === 50013) { // Missing Permissions for bot
-                        return interaction.editReply({ content: `\`❌\` I do not have permission to delete the channel **${channelToDelete.name}**. Please check my "Manage Channels" permission.` });
-                    }
-                    return interaction.editReply({ content: '`❌` An error occurred while trying to delete the channel (no DB record).' });
-                }
-            }
-
-            // If ticketData exists, proceed with normal deletion and DB cleanup
-            if (ticketData.status !== 'closed' && ticketData.status !== 'closed_channel_deleted') {
-                 console.log(`[Ticket Delete SC] Warning: Deleting ticket ${channelToDelete.id} which is not marked as closed (status: ${ticketData.status}). Proceeding...`);
-            }
-
-            try {
-                await channelToDelete.delete(`Ticket deleted by ${interaction.user.tag} (ID: ${interaction.user.id})`);
-                console.log(`[Ticket Delete SC] Channel ${channelToDelete.name} (ID: ${channelToDelete.id}) deleted by ${interaction.user.tag}.`);
-
-                await db.delete(ticketDataKey);
-                console.log(`[Ticket Delete SC] Database entry for ${ticketDataKey} removed.`);
-
-                // Optional: Log to a mod-log channel (implement setup for this first)
-                // ...
-
-                await interaction.editReply({ content: `\`✅\` Ticket channel **${channelToDelete.name}** and its data have been successfully deleted.` });
-
-            } catch (error) {
-                console.error(`[Ticket Delete SC] Error deleting ticket channel ${channelToDelete.id}:`, error);
-                if (error.code === 10003) { // Unknown Channel
-                    await interaction.editReply({ content: `\`❌\` Channel **${channelToDelete.name}** could not be found or was already deleted.` });
-                    if (ticketData) await db.delete(ticketDataKey); // Still attempt DB cleanup
-                } else if (error.code === 50013) { // Missing Permissions for bot
-                     await interaction.editReply({ content: `\`❌\` I do not have permission to delete the channel **${channelToDelete.name}**. Please check my "Manage Channels" permission.`});
-                }
-                else {
-                    await interaction.editReply({ content: '`❌` An error occurred while trying to delete the ticket channel.' });
-                }
-            }
-        }
+        } 
     },
 };
 

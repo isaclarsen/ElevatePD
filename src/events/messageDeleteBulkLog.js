@@ -2,7 +2,7 @@
 const { Events, EmbedBuilder, Colors, AuditLogEvent } = require('discord.js');
 
 module.exports = {
-    name: Events.MessageDeleteBulk,
+    name: Events.MessageDelete,
     async execute(messages, channel, db) { // messages is a Collection, channel is the channel object
         if (!channel.guild) return;
 

@@ -6,9 +6,6 @@ module.exports = {
     async execute(message, db) { // 'db' is passed from your main.js event loader
         if (!message.guild) return; // Ignore DMs
         if (message.partial) {
-            // If the message is partial, we might not have author or content.
-            // We can try to fetch it, but it might fail if the message is too old or already gone.
-            // For now, we'll log what we have. You could add fetching logic here if desired.
             console.log(`[MessageDelete] A partial message was deleted in ${message.guild.name} - Channel ID: ${message.channel.id}, Message ID: ${message.id}. Content/author might be unavailable.`);
             // return; // Decide if you want to log partials or not. For now, let's proceed.
         }

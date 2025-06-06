@@ -13,7 +13,7 @@ module.exports = {
                 .setRequired(true)
                 .addChoices(
                     { name: 'Message Deletion Logs', value: 'delete_logs' },
-                    // { name: 'Message Edit Logs', value: 'edit_logs' }, // Example for future
+                    { name: 'Message Edit Logs', value: 'edit_logs' },
                     // { name: 'Member Join/Leave Logs', value: 'member_logs' } // Example for future
                 ))
         .addChannelOption(option =>
