@@ -32,10 +32,6 @@ module.exports = {
                 .setDescription('Label for the first button.')
                 .setRequired(true))
         // --- OPTIONAL OPTIONS NEXT ---
-        .addStringOption(option => // Optional Thumbnail
-            option.setName('thumbnail_url')
-                .setDescription('URL for the E logo thumbnail on the right (e.g., your E logo).')
-                .setRequired(false))
         .addStringOption(option => // Optional Emoji for Button 1
             option.setName('emoji1')
                 .setDescription('Emoji for the first button (optional).')
@@ -66,15 +62,15 @@ module.exports = {
         const guildId = interaction.guild.id;
 
         // Construct the description in the desired format
-        const description = `⚠️ **Important notice:**\n\n${noticeText}\n\n${mainText}\n\nThanks for joining Elevate!`;
+        const description = `⚠️ **Important notice:**\`\`\`\n\n${noticeText}\n\n\`\`\`${mainText}\n\nThanks for joining Elevate!`;
 
         const embed = new EmbedBuilder()
             .setAuthor({ name: 'Elevate', iconURL: 'https://cdn.discordapp.com/attachments/1313509092630855722/1375503075485417703/Elevate_121.png?ex=6831ec90&is=68309b10&hm=a7de64ee3b3f67cde516b6c2bd7967418e8c5ca8e9f7d3efbdcf20afb08b0718&' })
             .setTitle(title)
             .setDescription(description)
-            .setColor(0x3498DB) // A nice blue color, similar to Dyno's if it uses blue
+            .setColor(Colors.Blue) // A nice blue color, similar to Dyno's if it uses blue
             .setThumbnail('https://cdn.discordapp.com/attachments/1313509092630855722/1375503075883749428/Elevate_PNG2.png?ex=6831ec90&is=68309b10&hm=c68a1b123dbd1d9e1e468f6d2aafcddaefcbf7d812bc8e353a7881a6e75c82b6&') // Your E logo
-            .setFooter({ text: '🇪 Elevate Community' }); // Or 'Elevate PD - 2025' if you prefer from your image
+            .setFooter({ iconURL: 'https://cdn.discordapp.com/attachments/1313509092630855722/1375503075883749428/Elevate_PNG2.png?ex=68446190&is=68431010&hm=bb1ca139af396bc6b98a34cdd428701493338e2a5abfa67d8d6200208e7d4293&', text: ' Elevate Community' }); // Or 'Elevate PD - 2025' if you prefer from your image
 
         const buttonsConfig = [];
         const actionRow = new ActionRowBuilder();
