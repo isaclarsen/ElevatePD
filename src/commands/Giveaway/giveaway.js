@@ -162,6 +162,12 @@ module.exports = {
                 .addStringOption(option => option.setName('new_duration').setDescription('New duration FROM NOW (e.g., 5m, 1h). Clears old duration.').setRequired(false))
                 .addIntegerOption(option => option.setName('new_winners').setDescription('New number of winners (1-20).').setMinValue(1).setMaxValue(20).setRequired(false))
                 .addStringOption(option => option.setName('new_prize').setDescription('New prize for the giveaway.').setRequired(false))
+        )
+        .addSubcommand(subcommand => 
+            subcommand
+                .setName('reroll')
+                .setDescription('Rerolls winners for an ended giveaway.')
+                .addStringOption(option => option.setName('message_id').setDescription('The message ID of the giveaway to reroll').setRequired(true))
         ),
         // Add .addSubcommand for 'reroll' and 'delete' later
 
@@ -396,6 +402,66 @@ module.exports = {
             } catch (error) {
                 console.error(`[Giveaway Edit] Error updating giveaway ${messageIdToEdit}:`, error);
                 await interaction.editReply({ content: '`❌` An error occurred while trying to update the giveaway message or save data.' });
+            }
+        }else if (subcommand === 'reroll') {
+            await interaction.deferReply({ ephemeral: true });
+            const messageIdToReroll = interaction.options.getString('message_id');
+
+            const giveawayKey = `giveaway_${guildId}_${messageIdToReroll}`;
+            const giveawayData = await db.get(giveawayKey);
+
+            if (!giveawayData) {
+                return interaction.editReply({ content: `\`❌\` No giveaway found with Message ID: \`${messageIdToReroll}\`.` });
+            }
+
+            if (giveawayData.status !== 'ended') {
+                return interaction.editReply({ content: `\`❌\` Giveaway \`${messageIdToReroll}\` has not ended yet. Cannot reroll.` });
+            }
+
+            const entrants = giveawayData.entrants || [];
+            if (entrants.length === 0) {
+                return interaction.editReply({ content: '`❌` No entrants to reroll.' });
+            }
+
+            let newWinners = [];
+            if (entrants.length <= giveawayData.winnerCount) {
+                newWinners = [...entrants];
+            } else {
+                const shuffledEntrants = [...entrants].sort(() => 0.5 - Math.random());
+                newWinners = shuffledEntrants.slice(0, giveawayData.winnerCount);
+            }
+
+            const winnerMentions = newWinners.map(winnerId => `<@${winnerId}>`).join(', ');
+
+            let channel;
+            try {
+                channel = await interaction.client.channels.fetch(giveawayData.channelId);
+            } catch (channelError) {
+                console.error(`[Reroll Command] Could not fetch channel ${giveawayData.channelId}: ${channelError.message}`);
+                return interaction.editReply({ content: '`❌` Could not fetch the giveaway channel. Please check the channel ID.' });
+            }
+
+            try {
+                const messageToEdit = await channel.messages.fetch(messageIdToReroll);
+                const rerollEmbed = new EmbedBuilder()
+                    .setTitle(`🎉 Giveaway Rerolled: ${giveawayData.prize} 🎉`)
+                    .setDescription(`**New Winner(s):** ${winnerMentions}\n\nHosted by: <@${giveawayData.hostId}>`)
+                    .setColor(Colors.Orange)
+                    .setTimestamp();
+
+                await messageToEdit.edit({ embeds: [rerollEmbed] });
+
+                await channel.send({
+                    content: `🎉 Congratulations to the new winner(s) ${winnerMentions}! 🎉`,
+                });
+
+                giveawayData.winners = newWinners;
+                await db.set(giveawayKey, giveawayData);
+
+                return interaction.editReply({ content: `\`✅\` Successfully rerolled the giveaway \`${messageIdToReroll}\`.` });
+            } catch (error) {
+                console.error(`[Reroll Command] Error editing message ${messageIdToReroll}: ${error.message}`);
+                return interaction.editReply({ content: '`❌` An error occurred while rerolling the giveaway. Please check the console for details.' });
             }
         }
     },

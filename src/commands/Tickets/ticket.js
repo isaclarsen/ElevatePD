@@ -39,19 +39,27 @@ module.exports = {
                         .setDescription('The channel where the ticket panel will be sent.')
                         .addChannelTypes(ChannelType.GuildText)
                         .setRequired(true))
-                .addRoleOption(option => // 2. support_role (REQUIRED)
-                    option.setName('support_role')
-                        .setDescription('The role that will have access to tickets.')
-                        .setRequired(true))
+                .addRoleOption(option =>
+                     option.setName('button1_support_role')
+                     .setDescription('Support role for the first category.')
+                     .setRequired(true))
                 .addStringOption(option => // 3. button1_label (REQUIRED)
-                    option.setName('button1_label')
+                        option.setName('button1_label')
                         .setDescription('Label for the first ticket category button.')
                         .setRequired(true))
                 .addStringOption(option => // 4. button1_category_name (REQUIRED)
                     option.setName('button1_category_name')
                         .setDescription('Internal category name for button 1.')
                         .setRequired(true))
-                // --- OPTIONAL OPTIONS NEXT ---
+                        // --- OPTIONAL OPTIONS NEXT ---
+                .addRoleOption(option =>
+                          option.setName('button2_support_role')
+                          .setDescription('Support role for the second category.')
+                          .setRequired(false))
+                .addRoleOption(option =>
+                          option.setName('button3_support_role')
+                          .setDescription('Support role for the third category.')
+                          .setRequired(false))
                 .addChannelOption(option => // 5. ticket_category_parent (OPTIONAL)
                     option.setName('ticket_category_parent')
                         .setDescription('Optional: Category for new ticket channels.')
@@ -89,13 +97,11 @@ module.exports = {
             await interaction.deferReply({ ephemeral: true });
 
             const panelChannel = interaction.options.getChannel('panel_channel');
-            const supportRole = interaction.options.getRole('support_role');
             const ticketCategoryParent = interaction.options.getChannel('ticket_category_parent');
             const panelTitle = interaction.options.getString('panel_title') || 'Open a Support Ticket';
             const panelDescription = interaction.options.getString('panel_description') || 'Please select a category below to create a new support ticket.';
 
             if (!panelChannel || panelChannel.type !== ChannelType.GuildText) { /* ... error handling ... */ }
-            if (!supportRole) { /* ... error handling ... */ }
             // ... (bot permission checks for panel channel and ManageChannels globally) ...
             const botPermissionsInPanelChannel = panelChannel.permissionsFor(interaction.guild.members.me);
             if (!botPermissionsInPanelChannel.has(PermissionFlagsBits.SendMessages) || !botPermissionsInPanelChannel.has(PermissionFlagsBits.EmbedLinks)) {
@@ -122,16 +128,18 @@ module.exports = {
                 const label = interaction.options.getString(`button${i}_label`);
                 const categoryName = interaction.options.getString(`button${i}_category_name`);
                 const emoji = interaction.options.getString(`button${i}_emoji`);
+                const buttonSupportRole = interaction.options.getRole(`button${i}_support_role`);
 
-                if (label && categoryName) { // Both label and category name are required for a button
-                    // Sanitize categoryName for customId or use index
+                console.log(`[Ticket Setup DBG] Button ${i}: Label='${label}', CatName='${categoryName}', SupportRoleObject='${buttonSupportRole ? buttonSupportRole.name : 'None'}', SupportRoleID='${buttonSupportRole ? buttonSupportRole.id : 'None'}'`);
+
+                if (label && categoryName && buttonSupportRole) {
                     const categoryIdPart = categoryName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').substring(0, 20) || `cat${i}`;
-                    const buttonCustomId = `create_ticket_${categoryIdPart}`; // Example: create_ticket_general_support
+                    const buttonCustomId = `create_ticket_${categoryIdPart}`;
 
                     const button = new ButtonBuilder()
                         .setCustomId(buttonCustomId)
                         .setLabel(label)
-                        .setStyle(ButtonStyle.Primary); // Or Secondary
+                        .setStyle(ButtonStyle.Primary);
                     if (emoji) {
                         try { button.setEmoji(emoji); }
                         catch (e) { console.warn(`[Ticket Setup] Invalid emoji for button ${i}: ${emoji}`); }
@@ -139,15 +147,19 @@ module.exports = {
                     actionRow.addComponents(button);
                     buttonConfigs.push({
                         label: label,
-                        categoryName: categoryName, // Store the user-friendly category name
+                        categoryName: categoryName,
                         emoji: emoji || null,
-                        customId: buttonCustomId // Store the generated customId
+                        customId: buttonCustomId,
+                        supportRoleId: buttonSupportRole.id
                     });
-                } else if (label || categoryName) {
-                    // If one is provided but not the other
-                    return interaction.editReply({ content: `\`❌\` For button ${i}, you must provide both a label and a category name.` });
+                } else if (label || categoryName || buttonSupportRole) { // If some but not all are provided
+                    // For button 1, all are required by command definition. For button 2 & 3, if user provides one part, they must provide all.
+                    if (i === 1 || (label && categoryName && !buttonSupportRole) || (label && !categoryName && buttonSupportRole) || (!label && categoryName && buttonSupportRole) ) {
+                        return interaction.editReply({ content: `\`❌\` For button ${i}, you must provide a label, category name, AND a specific support role for that category.` });
+                    }
                 }
             }
+        
 
             if (actionRow.components.length === 0) {
                 return interaction.editReply({ content: '`❌\` You must configure at least one ticket category button.' });
@@ -160,13 +172,12 @@ module.exports = {
                     guildId: guild.id,
                     panelChannelId: panelChannel.id,
                     panelMessageId: panelMessage.id,
-                    supportRoleId: supportRole.id,
                     ticketCategoryIdParent: ticketCategoryParent ? ticketCategoryParent.id : null,
                     buttons: buttonConfigs, // Store the array of button configurations
                     // ticketCounter is now managed by generateTicketChannelName
                 };
                 await db.set(`ticket_setup_${guild.id}`, setupData);
-                console.log(`[Ticket Setup] Panel created in ${panelChannel.name}. Message ID: ${panelMessage.id}. Support Role: ${supportRole.name}. Buttons: ${buttonConfigs.length}`);
+                console.log(`[Ticket Setup] Panel created. Message ID: ${panelMessage.id}. Buttons: ${buttonConfigs.length}`);
                 await interaction.editReply({ content: `\`✅\` Ticket panel with ${buttonConfigs.length} category button(s) successfully created in ${panelChannel}!` });
 
             } catch (error) {

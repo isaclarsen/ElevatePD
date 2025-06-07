@@ -175,10 +175,24 @@ client.on(Events.InteractionCreate, async interaction => {
                 }
 
                 const clickedButtonConfig = setupData.buttons.find(b => b.customId === interaction.customId);
+                const categorySpecificSupportRoleId = clickedButtonConfig.supportRoleId;
                 if (!clickedButtonConfig) {
                     console.log(`[Ticket Create Cat Button] No button configuration found for customId: ${interaction.customId}`);
                     return interaction.editReply({ content: '`❌` The ticket category for this button is not recognized. Please ask an admin to check the setup.' }).catch(console.error);
                 }
+
+                let categorySpecificSupportRoleObject = null; // Initialize to null
+                if (categorySpecificSupportRoleId) { // Check if the ID exists
+                    categorySpecificSupportRoleObject = guild.roles.cache.get(categorySpecificSupportRoleId);
+                }
+
+                if (categorySpecificSupportRoleObject) {
+                    // ... add perms using categorySpecificSupportRoleObject.id ...
+                    console.log(`[Ticket Create DBG] Added perms for support role: ${categorySpecificSupportRoleObject.name}`);
+                } else {
+                    console.warn(`[Ticket Create DBG] Support role with ID ${categorySpecificSupportRoleId} for category ${ticketCategoryName} not found in cache.`);
+                }
+
                 const ticketCategoryName = clickedButtonConfig.categoryName; // Category of the button clicked
 
                 // --- MODIFIED OPEN TICKET CHECK ---
@@ -212,10 +226,29 @@ client.on(Events.InteractionCreate, async interaction => {
                     { id: user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles] },
                     { id: interaction.client.user.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.ManageMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.ManageChannels] },
                 ];
-                const supportRole = guild.roles.cache.get(setupData.supportRoleId);
-                if (supportRole) {
-                    permissionOverwrites.push({ id: supportRole.id, allow: [PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.ReadMessageHistory, PermissionFlagsBits.EmbedLinks, PermissionFlagsBits.AttachFiles, PermissionFlagsBits.ManageMessages] });
-                } else { console.warn(`[Ticket Create Cat Button] Support role ${setupData.supportRoleId} not found.`); }
+                                let actualCategorySupportRoleObject = null; 
+                if (categorySpecificSupportRoleId) {
+                    actualCategorySupportRoleObject = guild.roles.cache.get(categorySpecificSupportRoleId);
+                }
+
+                if (actualCategorySupportRoleObject) {
+                    permissionOverwrites.push({ 
+                        id: actualCategorySupportRoleObject.id, // Use the ID of the fetched role object
+                        allow: [
+                            PermissionFlagsBits.ViewChannel, 
+                            PermissionFlagsBits.SendMessages, 
+                            PermissionFlagsBits.ReadMessageHistory, 
+                            PermissionFlagsBits.EmbedLinks, 
+                            PermissionFlagsBits.AttachFiles, 
+                            PermissionFlagsBits.ManageMessages
+                        ] 
+                    });
+                    console.log(`[Ticket Create DBG] Added permissions for support role: ${actualCategorySupportRoleObject.name} (ID: ${actualCategorySupportRoleObject.id})`);
+                } else {
+                    // This log means the categorySpecificSupportRoleId was found in clickedButtonConfig, 
+                    // but no role with that ID exists in the server's cache.
+                    console.warn(`[Ticket Create DBG] Support role with ID '${categorySpecificSupportRoleId}' (for category '${ticketCategoryName}') not found in guild cache.`);
+                }
 
                 let ticketChannel;
                 ticketChannel = await guild.channels.create({
@@ -231,7 +264,7 @@ client.on(Events.InteractionCreate, async interaction => {
                 const ticketDataKey = `ticket_data_${guildId}_${ticketChannel.id}`;
                 const ticketInfo = {
                     channelId: ticketChannel.id, guildId: guildId, userId: user.id, userTag: user.tag,
-                    status: 'open', createdAt: Date.now(), supportRoleId: setupData.supportRoleId,
+                    status: 'open', createdAt: Date.now(), supportRoleId: setupData.categorySpecificSupportRoleIdFromConfig,
                     ticketNumber: currentTicketCounter, // The helper function now increments and returns the new number
                     category: ticketCategoryName
                 };
@@ -240,7 +273,7 @@ client.on(Events.InteractionCreate, async interaction => {
                 const welcomeEmbed = new EmbedBuilder()
                     .setColor(Colors.Blue)
                     .setTitle(`${ticketCategoryName} Support Ticket #${String(ticketInfo.ticketNumber).padStart(4, '0')}`)
-                    .setDescription(`Welcome ${user}!\nThank you for creating a support ticket regarding **${ticketCategoryName}**. Please describe your issue.\n${supportRole || 'A staff member'} will be with you shortly.`)
+                    .setDescription(`Welcome ${user}!\nThank you for creating a support ticket regarding **${ticketCategoryName}**. Please describe your issue.\n${categorySpecificSupportRoleObject || 'A staff member'} will be with you shortly.`)
                     .setAuthor({ name: 'Elevate', iconURL: 'https://cdn.discordapp.com/attachments/1313509092630855722/1375503075485417703/Elevate_121.png?ex=6831ec90&is=68309b10&hm=a7de64ee3b3f67cde516b6c2bd7967418e8c5ca8e9f7d3efbdcf20afb08b0718&' })
                     .setThumbnail('https://cdn.discordapp.com/attachments/1313509092630855722/1375503075883749428/Elevate_PNG2.png?ex=6831ec90&is=68309b10&hm=c68a1b123dbd1d9e1e468f6d2aafcddaefcbf7d812bc8e353a7881a6e75c82b6&')
                     .addFields({ name: 'Opened By', value: `${user.tag} (${user.id})`, inline: true })
@@ -248,7 +281,11 @@ client.on(Events.InteractionCreate, async interaction => {
                 const closeButton = new ButtonBuilder().setCustomId(`close_ticket_${ticketChannel.id}`).setLabel('Close Ticket').setStyle(ButtonStyle.Danger).setEmoji('🔒');
                 const ticketActionRow = new ActionRowBuilder().addComponents(closeButton);
 
-                await ticketChannel.send({ content: supportRole ? `${supportRole}` : '', embeds: [welcomeEmbed], components: [ticketActionRow] });
+                await ticketChannel.send({ 
+                    content: categorySpecificSupportRoleObject ? `${categorySpecificSupportRoleObject}` : '', // Ping the category-specific support role if it exists
+                    embeds: [welcomeEmbed], 
+                    components: [ticketActionRow] 
+                });
                 await interaction.editReply({ content: `\`✅\` Your ticket for **${ticketCategoryName}** has been created: ${ticketChannel}` }).catch(console.error);
 
             } catch (error) {
@@ -259,155 +296,92 @@ client.on(Events.InteractionCreate, async interaction => {
             }
         }
         // --- TICKET CLOSE BUTTON ---
-        else // --- TICKET CLOSE BUTTON ---
-        if (interaction.customId.startsWith('close_ticket_')) {
+        else if (interaction.customId.startsWith('close_ticket_')) {
             const ticketChannelId = interaction.customId.split('_')[2];
             const guild = interaction.guild;
             const guildId = guild.id;
             const userWhoClicked = interaction.member;
 
-            console.log(`[Ticket Close DBG] Attempting to close ticket. Channel ID from button: ${ticketChannelId}, Clicked by: ${userWhoClicked.user.tag}`);
+            const ticketDataKey = `ticket_data_${guildId}_${ticketChannelId}`;
+            let ticketData = await db.get(ticketDataKey);
 
-            try {
-                const ticketDataKey = `ticket_data_${guildId}_${ticketChannelId}`;
-                let ticketData = await db.get(ticketDataKey); // Use let as we modify it
-                const setupDataKey = `ticket_setup_${guildId}`;
-                const setupData = await db.get(setupDataKey);
-
-                // ... (existing checks for !ticketData, ticketData.status, !setupData, permissions) ...
-                if (!ticketData || ticketData.status !== 'open') { /* ... */ return interaction.editReply({ content: '`⚠` This ticket is already closed or its data could not be found.' }).catch(console.error); }
-                if (!setupData) { /* ... */ return interaction.editReply({ content: '`❌` Ticket system setup data not found. Cannot close ticket.' }).catch(console.error); }
-                const isTicketCreator = ticketData.userId === userWhoClicked.id;
-                const hasSupportRole = setupData.supportRoleId ? userWhoClicked.roles.cache.has(setupData.supportRoleId) : false;
-                const hasManageChannelsPerm = userWhoClicked.permissions.has(PermissionFlagsBits.ManageChannels);
-                if (!isTicketCreator && !hasSupportRole && !hasManageChannelsPerm) { /* ... */ return interaction.editReply({ content: '`❌` You do not have permission to close this ticket.' }).catch(console.error); }
-
-
-                const ticketChannel = guild.channels.cache.get(ticketChannelId);
-                if (!ticketChannel) {
-                    // ... (existing logic for channel already deleted) ...
-                    await db.set(`${ticketDataKey}.status`, 'closed_channel_deleted');
-                    console.warn(`[Ticket Close Button] Ticket channel ${ticketChannelId} not found, marked as deleted in DB.`);
-                    return interaction.editReply({ content: '`⚠` The ticket channel seems to have been deleted.' }).catch(console.error);
-                }
-                console.log(`[Ticket Close DBG] Found ticket channel object: ${ticketChannel.name}`);
-
-
-                // --- TRANSCRIPT GENERATION ---
-                let transcriptContent = `Transcript for Ticket #${String(ticketData.ticketNumber || 'N/A').padStart(4, '0')} (${ticketData.category || 'General'})\n`;
-                transcriptContent += `Opened by: ${ticketData.userTag} (ID: ${ticketData.userId})\n`;
-                transcriptContent += `Opened at: ${new Date(ticketData.createdAt).toUTCString()}\n`;
-                transcriptContent += `Closed by: ${userWhoClicked.user.tag} (ID: ${userWhoClicked.id})\n`;
-                transcriptContent += `Closed at: ${new Date().toUTCString()}\n\n`;
-                transcriptContent += `-------------------------------- MESSAGES --------------------------------\n\n`;
-
-                let messagesFetched = 0;
-                let lastMessageId;
-                const messageLimit = 1000; // Limit messages to fetch to prevent issues with huge tickets, adjust as needed
-
-                while (messagesFetched < messageLimit) {
-                    const options = { limit: 100 };
-                    if (lastMessageId) {
-                        options.before = lastMessageId;
-                    }
-
-                    const fetchedMessages = await ticketChannel.messages.fetch(options);
-                    if (fetchedMessages.size === 0) {
-                        break; // No more messages to fetch
-                    }
-
-                    // Messages are fetched newest to oldest, so reverse for chronological order in transcript
-                    const messagesInOrder = Array.from(fetchedMessages.values()).reverse();
-
-                    for (const msg of messagesInOrder) {
-                        const timestamp = new Date(msg.createdTimestamp).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' });
-                        transcriptContent += `[${timestamp}] ${msg.author.tag}:\n${msg.content}\n`;
-                        if (msg.attachments.size > 0) {
-                            msg.attachments.forEach(att => {
-                                transcriptContent += `  [Attachment: ${att.name} - ${att.url}]\n`;
-                            });
-                        }
-                        transcriptContent += `\n`; // Add a blank line between messages
-                    }
-                    messagesFetched += fetchedMessages.size;
-                    lastMessageId = fetchedMessages.first().id;
-
-                    if (fetchedMessages.size < 100) {
-                        break; // Fetched all remaining messages
-                    }
-                }
-                if (messagesFetched >= messageLimit) {
-                     transcriptContent += `\n--- Transcript may be truncated. Fetched ${messageLimit} messages. ---\n`;
-                }
-                console.log(`[Ticket Close DBG] Fetched ${messagesFetched} messages for transcript of ticket ${ticketChannelId}.`);
-                // --- END TRANSCRIPT GENERATION ---
-
-
-                // --- Perform Closing Actions ---
-                ticketData.status = 'closed';
-                ticketData.closedBy = userWhoClicked.id;
-                ticketData.closedAt = Date.now();
-                console.log(`[Ticket Close DBG] Updating ticket data in DB for ${ticketChannelId}. New status: closed.`);
-                await db.set(ticketDataKey, ticketData);
-
-                // ... (existing permission edits and channel rename logic) ...
-                await ticketChannel.permissionOverwrites.edit(ticketData.userId, {
-                    SendMessages: false, ViewChannel: true
-                }).catch(err => console.warn(`[Ticket Close DBG] Failed to restrict user access for closed ticket ${ticketChannelId}: ${err.message}`));
-                
-                const ticketNumberDisplay = String(ticketData.ticketNumber || 'N/A').padStart(4, '0');
-                const ticketCategoryDisplay = ticketData.category ? `${ticketData.category.toLowerCase().replace(/[^a-zA-Z0-9]/g, '').substring(0,10)}-` : '';
-                const closedChannelName = `closed-${ticketCategoryDisplay}${ticketNumberDisplay}-${ticketData.userTag.replace(/[^a-zA-Z0-9_.-]/g, '').substring(0, 20) || 'user'}`.substring(0,100);
-
-                console.log(`[Ticket Close DBG] Attempting to rename channel ${ticketChannel.name} to ${closedChannelName}`);
-                await ticketChannel.setName(closedChannelName)
-                    .catch(err => console.warn(`[Ticket Close DBG] Failed to rename closed ticket ${ticketChannelId}: ${err.message}`));
-
-                const closeEmbed = new EmbedBuilder()
-                    .setColor(Colors.Orange)
-                    .setTitle(`Ticket #${ticketNumberDisplay} (${ticketData.category || 'General'}) Closed`)
-                    .setDescription(`This ticket has been closed by ${userWhoClicked}. A transcript has been generated.`) // Updated description
-                    .addFields(
-                        { name: 'Ticket Owner', value: `<@${ticketData.userId}>`, inline: true },
-                        { name: 'Closed By', value: `${userWhoClicked}`, inline: true }
-                    )
-                    .setTimestamp();
-                console.log(`[Ticket Close DBG] Sending close embed to ${ticketChannel.name}`);
-                
-                // Send transcript as an attachment
-                const transcriptFileName = `transcript-${guildId}-${ticketChannelId}.txt`;
-                const transcriptAttachment = {
-                    attachment: Buffer.from(transcriptContent, 'utf-8'),
-                    name: transcriptFileName
-                };
-
-                await ticketChannel.send({ embeds: [closeEmbed], files: [transcriptAttachment] });
-
-
-                // Disable the button on the message where the "Close Ticket" button was clicked
-                const originalButtonMessage = interaction.message; 
-                // ... (existing button disabling logic) ...
-                if (originalButtonMessage && originalButtonMessage.components.length > 0) {
-                    const disabledButton = new ButtonBuilder()
-                        .setCustomId(interaction.customId)
-                        .setLabel('Ticket Closed')
-                        .setStyle(ButtonStyle.Secondary)
-                        .setEmoji('🔒') 
-                        .setDisabled(true);
-                    const updatedRow = new ActionRowBuilder().addComponents(disabledButton);
-                    await originalButtonMessage.edit({ components: [updatedRow] }).catch(err => console.warn(`[Ticket Close DBG] Failed to disable close button for ${ticketChannelId} on message ${originalButtonMessage.id}: ${err.message}`));
-                }
-                
-                console.log(`[Ticket Close DBG] Replying to interaction for ticket ${ticketChannelId}.`);
-                await interaction.editReply({ content: `\`✅\` Ticket **${closedChannelName}** has been closed and a transcript has been saved in the channel.` }).catch(console.error);
-                console.log(`[Ticket Close DBG] Ticket ${ticketChannelId} successfully closed by ${userWhoClicked.user.tag}.`);
-
-            } catch (error) {
-                console.error(`[Ticket Close Button][Main Catch Block] Error closing ticket ${interaction.customId}:`, error);
-                if (!interaction.replied) { 
-                    await interaction.editReply({ content: '`❌` An error occurred while trying to close the ticket. Please check the console.' }).catch(console.error);
-                }
+            if (!ticketData || ticketData.status !== 'open') {
+                return interaction.editReply({ content: '`⚠` This ticket is already closed or its data could not be found.' }).catch(console.error);
             }
+
+            const ticketChannel = guild.channels.cache.get(ticketChannelId);
+            if (!ticketChannel) {
+                await db.set(`${ticketDataKey}.status`, 'closed_channel_deleted');
+                return interaction.editReply({ content: '`⚠` The ticket channel seems to have been deleted.' }).catch(console.error);
+            }
+
+            // Generate transcript
+            let transcriptContent = `Transcript for Ticket #${String(ticketData.ticketNumber || 'N/A').padStart(4, '0')} (${ticketData.category || 'General'})\n`;
+            // Add more transcript details here...
+
+            // Fetch messages for the transcript
+            let messagesFetched = 0;
+            let lastMessageId;
+            const messageLimit = 1000;
+
+            while (messagesFetched < messageLimit) {
+                const options = { limit: 100 };
+                if (lastMessageId) {
+                    options.before = lastMessageId;
+                }
+
+                const fetchedMessages = await ticketChannel.messages.fetch(options);
+                if (fetchedMessages.size === 0) break;
+                const messagesInOrder = Array.from(fetchedMessages.values()).reverse();
+
+                for (const msg of messagesInOrder) {
+                    const timestamp = new Date(msg.createdTimestamp).toLocaleString('en-US', { dateStyle: 'short', timeStyle: 'short' });
+                    transcriptContent += `[${timestamp}] ${msg.author.tag}:\n${msg.content}\n`;
+                    if (msg.attachments.size > 0) {
+                        msg.attachments.forEach(att => {
+                            transcriptContent += `  [Attachment: ${att.name} - ${att.url}]\n`;
+                        });
+                    }
+                    transcriptContent += `\n`;
+                }
+                messagesFetched += fetchedMessages.size;
+                lastMessageId = fetchedMessages.first().id;
+                if (fetchedMessages.size < 100) break;
+            }
+
+            if (messagesFetched >= messageLimit) {
+                transcriptContent += `\n--- Transcript may be truncated. Fetched ${messageLimit} messages. ---\n`;
+            }
+
+            // Update ticket data
+            ticketData.status = 'closed';
+            ticketData.closedBy = userWhoClicked.id;
+            ticketData.closedAt = Date.now();
+            await db.set(ticketDataKey, ticketData);
+
+            // Send transcript to user
+            const user = await interaction.client.users.fetch(ticketData.userId);
+            try {
+                await user.send({
+                    content: `Here is the transcript for your ticket in the category **${ticketData.category}**.`,
+                    files: [{ attachment: Buffer.from(transcriptContent, 'utf-8'), name: `transcript_${ticketChannelId}.txt` }]
+                });
+            } catch (error) {
+                console.error(`[Ticket Close] Failed to send transcript to user: ${error.message}`);
+            }
+
+            // Delete the channel after 10 seconds
+            setTimeout(async () => {
+                try {
+                    await ticketChannel.delete();
+                    console.log(`[Ticket Close] Deleted ticket channel ${ticketChannelId} after 10 seconds.`);
+                } catch (error) {
+                    console.error(`[Ticket Close] Error deleting ticket channel ${ticketChannelId}: ${error.message}`);
+                }
+            }, 10000);
+
+            // Confirm closure
+            await interaction.editReply({ content: `\`✅\` Ticket **${ticketChannel.name}** has been closed. The transcript has been sent through DM. Ticket channel will be removed in 10 seconds...` }).catch(console.error);
         }
         // --- GIVEAWAY ENTRY BUTTON ---
         else if (interaction.customId.startsWith('giveaway_entry_')) {
