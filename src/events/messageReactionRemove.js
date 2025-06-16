@@ -3,100 +3,132 @@ const { Events } = require('discord.js');
 
 module.exports = {
     name: Events.MessageReactionRemove,
-    async execute(reaction, user, db, client) {
+    // Signature to catch all args from main.js: (reaction, user, [mysteryArgIfPresent], db, client)
+    // The last two will always be db and client from your main.js dispatcher.
+    // The "mysteryArg" would be the 3rd if discord.js sends 3 args.
+    async execute(reaction, user, arg3, arg4, arg5) {
+        let db;
+        let client;
+        let potentialMysteryArg;
 
-        // ADDED/MODIFIED DEBUG LOGS (optional but good for confirmation)
+        // Determine what arg3, arg4, arg5 are based on how many args discord.js sent for the reaction
+        // Your main.js always appends 'db' and 'client' to ...args from discord.js
+        // Case 1: discord.js sent 2 args (reaction, user)
+        //   -> main.js calls execute(reaction, user, db, client)
+        //   -> arg3 is db, arg4 is client, arg5 is undefined
+        // Case 2: discord.js sent 3 args (reaction, user, rawData)
+        //   -> main.js calls execute(reaction, user, rawData, db, client)
+        //   -> arg3 is rawData, arg4 is db, arg5 is client
+
+        if (arg5 !== undefined) { // 5 arguments total to execute means discord.js sent 3
+            potentialMysteryArg = arg3;
+            db = arg4;
+            client = arg5;
+        } else { // 4 arguments total to execute means discord.js sent 2
+            potentialMysteryArg = undefined; // No mystery arg
+            db = arg3;
+            client = arg4;
+        }
+
         console.log(`[ReactionRemove V2 Debug] Event triggered. Emoji: ${reaction.emoji.name}, User: ${user.tag}`);
         console.log(`[ReactionRemove V2 Debug] reaction type: ${reaction ? reaction.constructor.name : typeof reaction}`);
         console.log(`[ReactionRemove V2 Debug] user type: ${user ? user.constructor.name : typeof user}`);
-        console.log(`[ReactionRemove V2 Debug] potentialMysteryArg type: ${potentialMysteryArg ? (potentialMysteryArg.constructor ? potentialMysteryArg.constructor.name : typeof potentialMysteryArg) : typeof potentialMysteryArg}`);
+        
+        if (potentialMysteryArg !== undefined) {
+            console.log(`[ReactionRemove V2 Debug] potentialMysteryArg type: ${potentialMysteryArg ? (potentialMysteryArg.constructor ? potentialMysteryArg.constructor.name : typeof potentialMysteryArg) : typeof potentialMysteryArg}`);
+            if (typeof potentialMysteryArg === 'object' && potentialMysteryArg !== null) {
+                console.log(`[ReactionRemove V2 Debug] potentialMysteryArg keys: ${Object.keys(potentialMysteryArg).join(', ')}`);
+            }
+        } else {
+            console.log(`[ReactionRemove V2 Debug] No 'potentialMysteryArg' received (discord.js likely sent 2 event args).`);
+        }
+        console.log(`[ReactionRemove V2 Debug] DB type: ${db ? db.constructor.name : typeof db}`);
+        console.log(`[ReactionRemove V2 Debug] Client type: ${client ? client.constructor.name : typeof client}`);
 
 
-        // Ignore bot reactions
         if (user.bot) {
-            console.log("[ReactionRemove V2] User is a bot, ignoring."); // Updated log prefix
+            console.log("[ReactionRemove V2] User is a bot, ignoring.");
             return;
         }
 
-        // When a reaction is received, check if the structure is partial
         if (reaction.partial) {
             try {
-                console.log("[ReactionRemove V2] Reaction is partial, fetching..."); // Updated log prefix
+                console.log("[ReactionRemove V2] Reaction is partial, fetching...");
                 await reaction.fetch();
             } catch (error) {
-                console.error('[ReactionRemove V2] Something went wrong when fetching the partial reaction:', error); // Updated log prefix
+                console.error('[ReactionRemove V2] Error fetching partial reaction:', error);
                 return;
             }
         }
-        // Also fetch message if partial
         if (reaction.message.partial) {
             try {
-                console.log("[ReactionRemove V2] Message is partial, fetching..."); // Updated log prefix
+                console.log("[ReactionRemove V2] Message is partial, fetching...");
                 await reaction.message.fetch();
             } catch (error) {
-                console.error('[ReactionRemove V2] Something went wrong when fetching the partial message:', error); // Updated log prefix
+                console.error('[ReactionRemove V2] Error fetching partial message:', error);
                 return;
             }
         }
 
+        if (!reaction.message.guild) { // Important check
+            console.log("[ReactionRemove V2] Reaction not from a guild. Ignoring.");
+            return;
+        }
         const guildId = reaction.message.guild.id;
-        const dbKey = `reactionrole_configs_${guildId}`;
-        console.log(`[ReactionRemove V2] Using DB key: ${dbKey}`); // Updated log prefix
+        const dbKey = `reactionrole_configs_${guildId}`; // Assuming this is for your old emoji reaction roles
+        console.log(`[ReactionRemove V2] Using DB key: ${dbKey}`);
 
-        // ADDED: Check if db is valid
         if (!db || typeof db.get !== 'function') {
             console.error('[ReactionRemove V2 Critical] db is not a valid QuickDB object before calling .get()!');
-            console.error(`[ReactionRemove V2 Critical] db type: ${typeof db}, constructor: ${db ? db.constructor.name : 'N/A'}`);
             return;
         }
 
-        const configs = await db.get(dbKey) || []; // THIS LINE SHOULD NOW WORK
-        // console.log(`[ReactionRemove V2] Fetched configs from DB:`, JSON.stringify(configs, null, 2)); // Updated log prefix
+        const configs = await db.get(dbKey) || [];
 
         const reactionConfig = configs.find(
             c => c.messageId === reaction.message.id && (c.emoji === reaction.emoji.name || c.emoji === reaction.emoji.toString())
         );
 
         if (!reactionConfig) {
-            console.log(`[ReactionRemove V2] No matching reaction role config found for emoji "${reaction.emoji.name}" (toString: "${reaction.emoji.toString()}") on message ${reaction.message.id}.`); // Updated log prefix
+            console.log(`[ReactionRemove V2] No matching reaction role config found for emoji "${reaction.emoji.name}" (toString: "${reaction.emoji.toString()}") on message ${reaction.message.id}.`);
             return;
         }
-        console.log(`[ReactionRemove V2] Found matching config:`, reactionConfig); // Updated log prefix
+        console.log(`[ReactionRemove V2] Found matching config:`, reactionConfig);
 
         const roleId = reactionConfig.roleId;
-        const guild = reaction.message.guild;
-        if (!guild) {
-            console.error("[ReactionRemove V2] reaction.message.guild is null. This should not happen if message is properly fetched."); // Updated log prefix
-            return;
-        }
+        const guild = reaction.message.guild; // Already checked reaction.message.guild exists
         const role = guild.roles.cache.get(roleId);
 
         if (!role) {
-            console.warn(`[ReactionRemove V2] Role ID ${roleId} not found in guild ${guildId}. Reaction role setup might be outdated or incorrect.`); // Updated log prefix
+            console.warn(`[ReactionRemove V2] Role ID ${roleId} not found in guild ${guildId}.`);
             return;
         }
-        console.log(`[ReactionRemove V2] Found role: ${role.name} (ID: ${role.id})`); // Updated log prefix
+        console.log(`[ReactionRemove V2] Found role: ${role.name} (ID: ${role.id})`);
 
-        const member = await guild.members.fetch(user.id).catch(err => {
-            console.error("[ReactionRemove V2] Error fetching member:", err); // Updated log prefix
-            return null;
-        });
+        let member; // Define member outside try-catch
+        try {
+            member = await guild.members.fetch(user.id);
+        } catch (error) {
+             console.error("[ReactionRemove V2] Error fetching member:", error);
+             return null; // Or handle differently
+        }
+
 
         if (!member) {
-            console.log(`[ReactionRemove V2] Could not fetch member ${user.tag}.`); // Updated log prefix
+            console.log(`[ReactionRemove V2] Could not fetch member ${user.tag}.`);
             return;
         }
-        console.log(`[ReactionRemove V2] Fetched member: ${member.user.tag}`); // Updated log prefix
+        console.log(`[ReactionRemove V2] Fetched member: ${member.user.tag}`);
 
         try {
             if (!member.roles.cache.has(role.id)) {
-                console.log(`[ReactionRemove V2] Member ${member.user.tag} does not have role ${role.name}. No action taken.`); // Updated log prefix
+                console.log(`[ReactionRemove V2] Member ${member.user.tag} does not have role ${role.name}. No action taken.`);
                 return;
             }
             await member.roles.remove(role);
-            console.log(`[ReactionRemove V2] SUCCESS: Removed role ${role.name} from ${user.tag}`); // Updated log prefix
+            console.log(`[ReactionRemove V2] SUCCESS: Removed role ${role.name} from ${user.tag}`);
         } catch (error) {
-            console.error(`[ReactionRemove V2] FAILED to remove role ${role.name} from ${user.tag}:`, error); // Updated log prefix
+            console.error(`[ReactionRemove V2] FAILED to remove role ${role.name} from ${user.tag}:`, error);
         }
     },
 };
