@@ -11,15 +11,6 @@ module.exports = {
         let client;
         let potentialMysteryArg;
 
-        // Determine what arg3, arg4, arg5 are based on how many args discord.js sent for the reaction
-        // Your main.js always appends 'db' and 'client' to ...args from discord.js
-        // Case 1: discord.js sent 2 args (reaction, user)
-        //   -> main.js calls execute(reaction, user, db, client)
-        //   -> arg3 is db, arg4 is client, arg5 is undefined
-        // Case 2: discord.js sent 3 args (reaction, user, rawData)
-        //   -> main.js calls execute(reaction, user, rawData, db, client)
-        //   -> arg3 is rawData, arg4 is db, arg5 is client
-
         if (arg5 !== undefined) { // 5 arguments total to execute means discord.js sent 3
             potentialMysteryArg = arg3;
             db = arg4;
